@@ -12,6 +12,7 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
+from .DCNv2.dcn_v2 import DCN
 
 from .utils import convolution, residual
 from .utils import make_layer, make_layer_revr
@@ -22,29 +23,32 @@ from .kp_utils import make_tl_layer, make_br_layer, make_kp_layer, make_ct_layer
 from .kp_utils import make_cnv_layer
 
 BN_MOMENTUM = 0.1
-def get_model_url(data='imagenet', name='dla34', hash='ba72cf86'):
-    return join('http://dl.yf.io/dla/models', data, '{}-{}.pth'.format(name, hash))
 
-def conv3x3(in_planes, out_planes, stride=1):
-    """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
+def get_model_url(data='imagenet', name='dla34', hash='ba72cf86'):
+    return os.path.join('http://dl.yf.io/dla/models', data, '{}-{}.pth'.format(name, hash))
+
+# def conv3x3(in_planes, out_planes, stride=1):
+#     """3x3 convolution with padding"""
+#     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
+#                      padding=1, bias=False)
 
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, stride=1, dilation = 1):
         super(BasicBlock, self).__init__()
-        self.conv1 = conv3x3(inplanes, planes, stride)
+        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=3, stride=stride,
+                     padding=dilation, bias=False, dilation=dilation)
         self.bn1 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes, planes)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1,
+                     padding=dilation, bias=False, dilation=dilation)
         self.bn2 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
-        self.downsample = downsample
         self.stride = stride
 
-    def forward(self, x):
-        residual = x
+    def forward(self, x, residual=None):
+        if residual is None:
+            residual = x
 
         out = self.conv1(x)
         out = self.bn1(out)
@@ -52,36 +56,42 @@ class BasicBlock(nn.Module):
 
         out = self.conv2(out)
         out = self.bn2(out)
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
+#         print("out.size:", out.size())
+#         print("residual.size", residual.size())
+        # out.size:
+        # torch.Size([6, 64, 64, 64])
+        # residual.size
+        # torch.Size([6, 64, 128, 128])
 
         out += residual
         out = self.relu(out)
 
         return out
+    #  The expanded size of the tensor (64) must match the existing size (128) at non-singleton dimension 3
 
 
 class Bottleneck(nn.Module):
-    expansion = 4
+    expansion = 2 # 这里和原始实现不同， reverse_residual?
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, stride=1):
         super(Bottleneck, self).__init__()
-        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
+        expansion = Bottleneck.expansion
+        bottle_planes = planes // expansion
+        self.conv1 = nn.Conv2d(inplanes, bottle_planes, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(bottle_planes, momentum=BN_MOMENTUM)
+        self.conv2 = nn.Conv2d(bottle_planes, bottle_planes, kernel_size=3, stride=stride,
                                padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
-        self.conv3 = nn.Conv2d(planes, planes * self.expansion, kernel_size=1,
+        self.bn2 = nn.BatchNorm2d(bottle_planes, momentum=BN_MOMENTUM)
+        self.conv3 = nn.Conv2d(bottle_planes, planes, kernel_size=1,
                                bias=False)
-        self.bn3 = nn.BatchNorm2d(planes * self.expansion,
+        self.bn3 = nn.BatchNorm2d(planes,
                                momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
-        self.downsample = downsample
         self.stride = stride
 
-    def forward(self, x):
-        residual = x
+    def forward(self, x, residual=None):
+        if residual is None:
+            residual = x
 
         out = self.conv1(x)
         out = self.bn1(out)
@@ -93,9 +103,6 @@ class Bottleneck(nn.Module):
 
         out = self.conv3(out)
         out = self.bn3(out)
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
 
         out += residual
         out = self.relu(out)
@@ -177,6 +184,7 @@ class Tree(nn.Module):
         if level_root:
             root_dim += in_channels
         if levels == 1:
+#             print("levels = 1", in_channels, out_channels, stride) # levels = 1 32 64 2
             self.tree1 = block(in_channels, out_channels, stride,
                                dilation=dilation)
             self.tree2 = block(out_channels, out_channels, 1,
@@ -213,6 +221,12 @@ class Tree(nn.Module):
         residual = self.project(bottom) if self.project else bottom
         if self.level_root:
             children.append(bottom)
+#         print("x.size:",x.size())
+#         print("residual.size:",residual.size()) 
+#         x.size:
+#         torch.Size([6, 32, 256, 256])
+#         residual.size:
+#         torch.Size([6, 64, 128, 128])
         x1 = self.tree1(x, residual)
         if self.levels == 1:
             x2 = self.tree2(x1)
@@ -242,9 +256,9 @@ class DLA(nn.Module):
                            level_root=False,
                            root_residual=residual_root)
         self.level3 = Tree(levels[3], block, channels[2], channels[3], 2,
-                           level_root=True, root_residual=residual_root)
+                           level_root=True, root_residual=residual_root) # levels[3] = 2
         self.level4 = Tree(levels[4], block, channels[3], channels[4], 2,
-                           level_root=True, root_residual=residual_root)
+                           level_root=True, root_residual=residual_root) # 
         self.level5 = Tree(levels[5], block, channels[4], channels[5], 2,
                            level_root=True, root_residual=residual_root)
 
@@ -281,6 +295,20 @@ class DLA(nn.Module):
         y = []
         x = self.base_layer(x)
         for i in range(6):
+#             print(i) # 0, 0, 1, 1, 2, 2
+                    # 0
+                    # torch.Size([6, 16, 511, 511])
+                    # 0
+                    # torch.Size([6, 16, 511, 511])
+                    # 1
+                    # torch.Size([6, 16, 511, 511])
+                    # 1
+                    # torch.Size([6, 16, 511, 511])
+                    # 2
+                    # torch.Size([6, 32, 256, 256])
+                    # 2
+                    # torch.Size([6, 32, 256, 256])
+#             print(x.size())
             x = getattr(self, 'level{}'.format(i))(x)
             y.append(x)
         return y
@@ -298,10 +326,13 @@ class DLA(nn.Module):
         self.load_state_dict(model_weights)
 
 
-def dla34(pretrained=True, **kwargs):  # DLA-34
+# def dla34(pretrained=True, **kwargs):  # DLA-34
+#     print(**kwargs)
+def dla34(pretrained=True):  # DLA-34
+#     print(**kwargs)
     model = DLA([1, 1, 1, 2, 2, 1],
                 [16, 32, 64, 128, 256, 512],
-                block=BasicBlock, **kwargs)
+                block=BasicBlock)
     if pretrained:
         model.load_pretrained_model(data='imagenet', name='dla34', hash='ba72cf86')
     return model
@@ -425,8 +456,8 @@ class DLASeg(nn.Module):
         final_kernel, 
         last_level,
         out_channel = 0,
-        db,  
-        out_dim,
+        db = None,  
+        out_dim = 80,
         pre=None, 
         cnv_dim=256, 
         make_tl_layer=make_tl_layer, make_br_layer=make_br_layer, make_ct_layer=make_ct_layer,
@@ -515,8 +546,8 @@ class DLASeg(nn.Module):
         br_cnv_  = self.br_cnvs
         ct_cnv_ = self.ct_cnvs
         tl_heat_ = self.tl_heats
-        br_heat_ = self.br_cnvs
-        ct_heat_ = self.ct_cnvs
+        br_heat_ = self.br_heats
+        ct_heat_ = self.ct_heats
         tl_tag_ = self.tl_tags
         br_tag_ = self.br_tags
         tl_regr_ = self.tl_regrs
@@ -565,8 +596,8 @@ class DLASeg(nn.Module):
         br_cnv_  = self.br_cnvs
         ct_cnv_ = self.ct_cnvs
         tl_heat_ = self.tl_heats
-        br_heat_ = self.br_cnvs
-        ct_heat_ = self.ct_cnvs
+        br_heat_ = self.bt_heats
+        ct_heat_ = self.ct_heats
         tl_tag_ = self.tl_tags
         br_tag_ = self.br_tags
         tl_regr_ = self.tl_regrs
@@ -580,30 +611,6 @@ class DLASeg(nn.Module):
         self.ida_up(y, 0, len(y))
 
         x = y[-1] # 只取最后一个feature map
-
-        x_list = []
-        for i in range(self.stage3_cfg['NUM_BRANCHES']):
-            if self.transition2[i] is not None:
-                x_list.append(self.transition2[i](y_list[-1]))
-            else:
-                x_list.append(y_list[i])
-        y_list = self.stage3(x_list)
-
-        x_list = []
-        for i in range(self.stage4_cfg['NUM_BRANCHES']):
-            if self.transition3[i] is not None:
-                x_list.append(self.transition3[i](y_list[-1]))
-            else:
-                x_list.append(y_list[i])
-        x = self.stage4(x_list)
-
-        # Upsampling
-        x0_h, x0_w = x[0].size(2), x[0].size(3)
-        x1 = F.upsample(x[1], size=(x0_h, x0_w), mode='bilinear')
-        x2 = F.upsample(x[2], size=(x0_h, x0_w), mode='bilinear')
-        x3 = F.upsample(x[3], size=(x0_h, x0_w), mode='bilinear')
-
-        x = torch.cat([x[0], x1, x2, x3], 1)
 
         cnv = cnv_(x)
 
