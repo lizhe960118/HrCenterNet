@@ -17,7 +17,7 @@ class Config:
         self._configs["val_iter"]          = 100
         self._configs["batch_size"]        = 1
         self._configs["snapshot_name"]     = None
-        self._configs["prefetch_size"]     = 100
+        self._configs["prefetch_size"]     = 6
         self._configs["weight_decay"]      = False
         self._configs["weight_decay_rate"] = 1e-5
         self._configs["weight_decay_type"] = "l2"

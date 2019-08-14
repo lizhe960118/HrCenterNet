@@ -240,9 +240,9 @@ class kp(nn.Module):
 
     def _test(self, *xs, **kwargs):
         image = xs[0]
-
+        print(image)
         inter = self.pre(image)
-
+        
         outs          = []
 
         layers = zip(

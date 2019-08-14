@@ -51,7 +51,7 @@ python train.py HRNet
 ```
 We provide the configuration file (`HRNet.json`) and the model file (`HRNet-104.py`) for CenterNet in this repo. 
 
-To cotinue training:
+To continue training:
 
 1. modify the `pretrained` in `HRNet.json`
 2. `python train.py HRNet --iter 10000`

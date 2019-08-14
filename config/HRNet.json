@@ -1,27 +1,32 @@
 {
     "system": {
-        "dataset": "MSCOCO",
-        "batch_size": 12,
+        "dataset": "MYCOCO",
+        "batch_size": 48,
         "sampling_function": "kp_detection",
 
         "train_split": "trainval",
         "val_split": "minival",
+        "test_split": "testdev",
 
         "learning_rate": 0.00025,
-        "decay_rate": 10,
+        "decay_rate": 1.12,
 
         "val_iter": 500,
+        "display":50,
 
         "opt_algo": "adam",
         "prefetch_size": 6,
 
         "max_iter": 480000,
-        "stepsize": 450000,
+        "stepsize": 10000,
         "snapshot": 5000,
 
-        "chunk_sizes": [6,6],
+        "chunk_sizes": [6,6,6,6,6,6,6,6],
 
-        "data_dir": "../../trainset/1"
+        "data_dir": "/data/lizhe",
+        "result_dir": "./myresults",
+        "cache_dir": "./mycache",
+        "pretrain": "./mycache/nnet/HRNet/HRNet_255000.pkl"
     },
     
     "db": {
@@ -42,7 +47,7 @@
         "test_scales": [1],
 
         "top_k": 70,
-        "categories": 80,
+        "categories": 4,
         "kp_categories": 1,
         "ae_threshold": 0.5,
         "nms_threshold": 0.5,

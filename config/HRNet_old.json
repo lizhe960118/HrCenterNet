@@ -1,5 +1,5 @@
 {
-   "system": {
+    "system": {
         "dataset": "MSCOCO",
         "batch_size": 48,
         "sampling_function": "kp_detection",
@@ -13,15 +13,18 @@
         "val_iter": 500,
 
         "opt_algo": "adam",
-        "prefetch_size":2, 
+        "prefetch_size": 6,
 
         "max_iter": 480000,
         "stepsize": 450000,
         "snapshot": 5000,
 
-        "chunk_size":[6,6,6,6,6,6,6,6],
+        "chunk_sizes": [6,6,6,6,6,6,6,6],
 
-        "data_dir": "/data/lizhe"
+        "data_dir": "/data/lizhe",
+        
+        "pretrain": "./cache/nnet/HRNet/HRNet_400000.pkl"
+
     },
     
     "db": {

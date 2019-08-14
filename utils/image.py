@@ -2,8 +2,16 @@ import cv2
 import numpy as np
 import random
 
-def grayscale(image):
-    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+# def grayscale(image):
+#     print("read image", image.shape) # (511, 511, 3)
+#     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+#     print("after to gray", image.shape)
+#     return image
+def rgb2gray(image):
+    return np.dot(image[...,:3], [0.299, 0.587, 0.114])
+
+def bgr2gray(image):
+    return rgb2gray(image[:,:,::-1])
 
 def normalize_(image, mean, std):
     image -= mean
@@ -33,9 +41,14 @@ def contrast_(data_rng, image, gs, gs_mean, var):
 def color_jittering_(data_rng, image):
     functions = [brightness_, contrast_, saturation_]
     random.shuffle(functions)
-
-    gs = grayscale(image)
+    
+#     print("before garyscale")
+#     gs = grayscale(image)
+#     gs = gs.astype(np.float32) / 255.
+#     print("after garyscale")
+    gs = bgr2gray(image)
     gs_mean = gs.mean()
+
     for f in functions:
         f(data_rng, image, gs, gs_mean, 0.4)
 

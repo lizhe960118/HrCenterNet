@@ -123,6 +123,16 @@ class NetworkFactory(object):
         with open(pretrained_model, "rb") as f:
             params = torch.load(f)
             self.model.load_state_dict(params)
+#             modify_params = {}
+#             for k,v in params.items():
+# #                 if k.split('.')[-1] != 'num_batches_tracked': 
+#                 if (k.split('.')[-1] != 'num_batches_tracked') and (k.split('.')[1] not in ['tl_heats', 'br_heats', 'ct_heats']):
+#                     modify_params[k] = v
+#             model_dict = self.model.state_dict()
+#             modify_params = {k: v for k, v in modify_params.items() if k in model_dict}
+#             model_dict.update(modify_params)
+# #             self.model.load_state_dict(modify_params)
+#             self.model.load_state_dict(model_dict)
 
     def load_params(self, iteration):
         cache_file = system_configs.snapshot_file.format(iteration)
@@ -130,6 +140,15 @@ class NetworkFactory(object):
         with open(cache_file, "rb") as f:
             params = torch.load(f)
             self.model.load_state_dict(params)
+#             modify_params = {}
+#             for k,v in params.items():
+#                 if (k.split('.')[-1] != 'num_batches_tracked') and (k.split('.')[1] not in ['tl_heats', 'br_heats', 'ct_heats']): 
+#                     modify_params[k] = v
+#             model_dict = self.model.state_dict()
+#             modify_params = {k: v for k, v in modify_params.items() if k in model_dict}
+#             model_dict.update(modify_params)
+# #             self.model.load_state_dict(modify_params)
+#             self.model.load_state_dict(model_dict)
 
     def save_params(self, iteration):
         cache_file = system_configs.snapshot_file.format(iteration)

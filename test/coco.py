@@ -85,24 +85,61 @@ def kp_detection(db, nnet, result_dir, debug=False, decode_func=kp_decode):
 
     top_bboxes = {}
     for ind in tqdm(range(0, num_images), ncols=80, desc="locating kps"):
+        #if ind < 1530:
+        #    continue
+            
         db_ind = db_inds[ind]
 
         image_id   = db.image_ids(db_ind)
         image_file = db.image_file(db_ind)
-        image      = cv2.imread(image_file)
+        # print(db_ind, image_id, image_file)
+        
+#         if image_file == "/data/lizhe/deepv_resize/nanchang/20180202/JPEGImages/19878.jpg":
+#             continue
+#         if image_file == "/data/lizhe/deepv_resize/nanchang/20180202/JPEGImages/25261.jpg":
+#             continue
+#         print(image_file)
+#         if not os.path.exists(image_file):
+#             continue
+        
+        if not check_pic(image_file):
+            print('corrupt img',image_file)
+            continue
+
+        image = cv2.imread(image_file)
 
         height, width = image.shape[0:2]
 
         detections = []
         center_points = []
 
-        for scale in scales:
-            new_height = int(height * scale)
-            new_width  = int(width * scale)
+        for scale in scales: # 这里默认单尺度scale = 1
+            # print(scale)
+            #scale_height = 1
+            #scale_width = 1
+            #if height > 2000 or width > 2000:
+            # #    print("large image, sample to 1/2")
+            #    scale_height = 1280 / height
+            #    scale_width = 1024 / width
+            
+            
+            #scale_height = 511 / height
+            #scale_width = 511 / width
+            scale_height = 799 / height
+            scale_width = 799 / width
+            # max_height_width = max(height, width)
+            # scale = 511 / max_height_width # 长边为512
+            # new_height = int(height * scale)
+            # new_width  = int(width * scale)
+            new_height = int(height * scale_height)
+            new_width  = int(width * scale_width)
             new_center = np.array([new_height // 2, new_width // 2])
-
+            
+            # 这里设置测试尺度为512 * 512
             inp_height = new_height | 127
             inp_width  = new_width  | 127
+            # inp_height = 511
+            # inp_width = 511
 
             images  = np.zeros((1, 3, inp_height, inp_width), dtype=np.float32)
             ratios  = np.zeros((1, 2), dtype=np.float32)
@@ -121,7 +158,8 @@ def kp_detection(db, nnet, result_dir, debug=False, decode_func=kp_decode):
 
             images[0]  = resized_image.transpose((2, 0, 1))
             borders[0] = border
-            sizes[0]   = [int(height * scale), int(width * scale)]
+            # sizes[0]   = [int(height * scale), int(width * scale)]
+            sizes[0]   = [int(height * scale_height), int(width * scale_width)]
             ratios[0]  = [height_ratio, width_ratio]       
 
             images = np.concatenate((images, images[:, :, :, ::-1]), axis=0)
@@ -129,23 +167,29 @@ def kp_detection(db, nnet, result_dir, debug=False, decode_func=kp_decode):
             dets, center = decode_func(nnet, images, K, ae_threshold=ae_threshold, kernel=nms_kernel) # 返回上层，调用nnet.test
             dets   = dets.reshape(2, -1, 8)
             center = center.reshape(2, -1, 4)
-            dets[1, :, [0, 2]] = out_width - dets[1, :, [2, 0]]
+            dets[1, :, [0, 2]] = out_width - dets[1, :, [2, 0]] # 翻转的图像
             center[1, :, [0]] = out_width - center[1, :, [0]]
             dets   = dets.reshape(1, -1, 8)
             center   = center.reshape(1, -1, 4)
             
             _rescale_dets(dets, ratios, borders, sizes)
-            center [...,[0]] /= ratios[:, 1][:, None, None]
-            center [...,[1]] /= ratios[:, 0][:, None, None] 
+            center [...,[0]] /= ratios[:, 1][:, None, None] # x / width_ratio
+            center [...,[1]] /= ratios[:, 0][:, None, None] # y / higth_ratio
             center [...,[0]] -= borders[:, 2][:, None, None]
             center [...,[1]] -= borders[:, 0][:, None, None]
             np.clip(center [...,[0]], 0, sizes[:, 1][:, None, None], out=center [...,[0]])
             np.clip(center [...,[1]], 0, sizes[:, 0][:, None, None], out=center [...,[1]])
-            dets[:, :, 0:4] /= scale
-            center[:, :, 0:2] /= scale
+           
+            # dets[:, :, 0:4] /= scale
+            dets[:, :, [0, 2]] /= scale_width
+            dets[:, :, [1, 3]] /= scale_height
+            # center[:, :, 0:2] /= scale
+            center[:, :, 0] /= scale_width
+            center[:, :, 1] /= scale_height
 
-            if scale == 1:
-              center_points.append(center)
+            # if scale == 1:
+            center_points.append(center)
+                
             detections.append(dets)
 
         detections = np.concatenate(detections, axis=1)
@@ -325,3 +369,12 @@ def kp_detection(db, nnet, result_dir, debug=False, decode_func=kp_decode):
 
 def testing(db, nnet, result_dir, debug=False):
     return globals()[system_configs.sampling_function](db, nnet, result_dir, debug=debug)
+
+def check_pic(path):
+    try:
+        Image.open(path).load()
+    except:
+        print('ERROR: %s' % path)
+        return False
+    else:
+        return True

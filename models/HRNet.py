@@ -119,7 +119,8 @@ def make_ct_layer(dim):
 class model(hr):
     def __init__(self, db):
 
-        out_dim = 80
+        #out_dim = 80
+        out_dim = 4
         super(model, self).__init__(
             db,out_dim,cnv_dim=256,
             make_tl_layer=make_tl_layer,

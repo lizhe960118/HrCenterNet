@@ -53,6 +53,7 @@ def _get_border(border, size):
     return border // i
 
 def random_crop(image, detections, random_scales, view_size, border=64):
+    # view_height is input_size
     view_height, view_width   = view_size
     image_height, image_width = image.shape[0:2]
 

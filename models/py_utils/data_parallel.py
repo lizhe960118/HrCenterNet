@@ -55,6 +55,7 @@ class DataParallel(Module):
         self.dim = dim
         self.module = module
         self.device_ids = device_ids
+        print(device_ids)
         self.chunk_sizes = chunk_sizes
         self.output_device = output_device
         if len(self.device_ids) == 1:
@@ -111,6 +112,7 @@ def data_parallel(module, inputs, device_ids=None, output_device=None, dim=0, mo
     if len(device_ids) == 1:
         return module(*inputs[0], **module_kwargs[0])
     used_device_ids = device_ids[:len(inputs)]
+    # print(used_device_ids)
     replicas = replicate(module, used_device_ids)
     outputs = parallel_apply(replicas, inputs, module_kwargs, used_device_ids)
     return gather(outputs, output_device, dim)

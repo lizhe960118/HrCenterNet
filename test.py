@@ -15,6 +15,7 @@ from nnet.py_factory import NetworkFactory
 from db.datasets import datasets
 
 torch.backends.cudnn.benchmark = False
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Test CenterNet")

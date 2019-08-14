@@ -12,30 +12,40 @@ from config import system_configs
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
-class MSCOCO(DETECTION):
+class MYCOCO(DETECTION):
     def __init__(self, db_config, split):
-        super(MSCOCO, self).__init__(db_config)
+        super(MYCOCO, self).__init__(db_config)
         data_dir   = system_configs.data_dir
         result_dir = system_configs.result_dir
         cache_dir  = system_configs.cache_dir
 
         self._split = split
         self._dataset = {
-            "trainval": "trainval2014",
-            "minival": "minival2014",
-            "testdev": "testdev2017"
+            "trainval": "train",
+            "minival": "val",
+            "testdev": "test"
         }[self._split]
         
-        self._coco_dir = os.path.join(data_dir, "coco")
+        # self._coco_dir = os.path.join(data_dir, "coco")
 
-        self._label_dir  = os.path.join(self._coco_dir, "annotations")
-        self._label_file = os.path.join(self._label_dir, "instances_{}.json")
-        self._label_file = self._label_file.format(self._dataset)
+        # self._label_dir  = os.path.join(self._coco_dir, "annotations")
+        # self._label_file = os.path.join(self._label_dir, "instances_{}.json")
+        # self._label_file = self._label_file.format(self._dataset)
+        if self._dataset == "train":
+            data_dir += "/deepv_resize"
+            self._label_file = os.path.join(data_dir, "train.json")
+        elif self._dataset == "val":
+            data_dir += "/deepv_49w_src"
+            self._label_file = os.path.join(data_dir, "test.json")
+        elif self._dataset == "test":
+            data_dir += "/deepv_49w_src"
+            self._label_file = os.path.join(data_dir, "test.json")
 
-        self._image_dir  = os.path.join(self._coco_dir, "images", self._dataset)
+#         self._image_dir  = os.path.join(self._coco_dir, "images", self._dataset)
+        self._image_dir = data_dir
         self._image_file = os.path.join(self._image_dir, "{}")
 
-        self._data = "coco"
+        # self._data = "coco"
         self._mean = np.array([0.40789654, 0.44719302, 0.47026115], dtype=np.float32)
         self._std  = np.array([0.28863828, 0.27408164, 0.27809835], dtype=np.float32)
         self._eig_val = np.array([0.2141788, 0.01817699, 0.00341571], dtype=np.float32)
@@ -45,24 +55,27 @@ class MSCOCO(DETECTION):
             [-0.56089297, 0.71832671, 0.41158938]
         ], dtype=np.float32)
 
-        self._cat_ids = [
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 
-            14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 
-            24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 
-            37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 
-            48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 
-            58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 
-            72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 
-            82, 84, 85, 86, 87, 88, 89, 90
-        ]
+#         self._cat_ids = [
+#             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 
+#             14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 
+#             24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 
+#             37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 
+#             48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 
+#             58, 59, 60, 61, 62, 63, 64, 65, 67, 70, 
+#             72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 
+#             82, 84, 85, 86, 87, 88, 89, 90
+#         ]
+        self._cat_ids = [1, 2, 3, 4]
         self._classes = {
             ind + 1: cat_id for ind, cat_id in enumerate(self._cat_ids)
         }
         self._coco_to_class_map = {
             value: key for key, value in self._classes.items()
         }
-
-        self._cache_file = os.path.join(cache_dir, "coco_{}.pkl".format(self._dataset))
+        
+        self._data = "coco"
+        # self._cache_file = os.path.join(cache_dir, "coco_{}.pkl".format(self._dataset))
+        self._cache_file = os.path.join(cache_dir, "mycoco_{}.pkl".format(self._dataset))
         self._load_data()
         self._db_inds = np.arange(len(self._image_ids))
 
@@ -101,6 +114,7 @@ class MSCOCO(DETECTION):
     def _extract_data(self):
         self._coco    = COCO(self._label_file)
         self._cat_ids = self._coco.getCatIds()
+#         print(self._cat_ids)
 
         coco_image_ids = self._coco.getImgIds()
 
@@ -111,7 +125,6 @@ class MSCOCO(DETECTION):
         self._detections = {}
         for ind, (coco_image_id, image_id) in enumerate(tqdm(zip(coco_image_ids, self._image_ids))):
             image      = self._coco.loadImgs(coco_image_id)[0]
-#             print(image.shape)
             bboxes     = []
             categories = []
 

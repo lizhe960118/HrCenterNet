@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from .py_utils import DLAseg, AELoss, _neg_loss, convolution, residual
+from .py_utils import hr32, AELoss, _neg_loss, convolution, residual
 from .py_utils import TopPool, BottomPool, LeftPool, RightPool
 
 class pool(nn.Module):
@@ -116,21 +116,13 @@ def make_br_layer(dim):
 def make_ct_layer(dim):
     return center_pool(dim)
 
-class model(DLASeg):
-
+class model(hr32):
     def __init__(self, db):
-        down_ratio = 4
-        out_dim = 80
 
+        #out_dim = 80
+        out_dim = 4
         super(model, self).__init__(
-            "dla34",
-            pretrained = True, 
-            down_ratio=down_ratio,
-            final_kernel=1,
-            last_level=5,
-            db = db,
-            out_dim = 80,
-            cnv_dim=256,
+            db,out_dim,cnv_dim=256,
             make_tl_layer=make_tl_layer,
             make_br_layer=make_br_layer,
             make_ct_layer=make_ct_layer

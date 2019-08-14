@@ -63,7 +63,7 @@ def kp_detection(db, k_ind, data_aug, debug):
     gaussian_iou  = db.configs["gaussian_iou"]
     gaussian_rad  = db.configs["gaussian_radius"]
 
-    max_tag_len = 128
+    max_tag_len = 500
 
     # allocating memory
     images      = np.zeros((batch_size, 3, input_size[0], input_size[1]), dtype=np.float32)
@@ -90,9 +90,10 @@ def kp_detection(db, k_ind, data_aug, debug):
         # reading image
         image_file = db.image_file(db_ind)
         image      = cv2.imread(image_file)
-
+#         print("reading image", image_file)
         # reading detections
         detections = db.detections(db_ind)
+#         print("reading detections", detections)
 
         # cropping an image randomly
         if not debug and rand_crop:
@@ -111,16 +112,21 @@ def kp_detection(db, k_ind, data_aug, debug):
             image[:] = image[:, ::-1, :]
             width    = image.shape[1]
             detections[:, [0, 2]] = width - detections[:, [2, 0]] - 1
-
+#         print("after flopping", detections)
         if not debug:
             image = image.astype(np.float32) / 255.
             if rand_color:
+#                 print("before rand color")
+#                 print(data_rng)
                 color_jittering_(data_rng, image)
+#                 print("this test for color")
                 if lighting:
                     lighting_(data_rng, image, 0.1, db.eig_val, db.eig_vec)
+#             print("after rand color")
+#             image = image.astype(np.float32) / 255.
             normalize_(image, db.mean, db.std)
         images[b_ind] = image.transpose((2, 0, 1))
-
+#         print("modify detections", detections)
         for ind, detection in enumerate(detections):
             category = int(detection[-1]) - 1
             #category = 0
@@ -189,7 +195,7 @@ def kp_detection(db, k_ind, data_aug, debug):
     br_tags     = torch.from_numpy(br_tags)
     ct_tags     = torch.from_numpy(ct_tags)
     tag_masks   = torch.from_numpy(tag_masks)
-
+#     print("finish this image")
     return {
         "xs": [images, tl_tags, br_tags, ct_tags],
         "ys": [tl_heatmaps, br_heatmaps, ct_heatmaps, tag_masks, tl_regrs, br_regrs, ct_regrs]
